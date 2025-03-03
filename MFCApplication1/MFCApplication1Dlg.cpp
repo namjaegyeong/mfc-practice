@@ -65,6 +65,7 @@ BEGIN_MESSAGE_MAP(CMFCApplication1Dlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_BN_CLICKED(IDC_BUTTON1, &CMFCApplication1Dlg::OnClickedButton1)
 END_MESSAGE_MAP()
 
 
@@ -100,6 +101,14 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 작은 아이콘을 설정합니다.
 
 	// TODO: 여기에 추가 초기화 작업을 추가합니다.
+
+	// Initialize MFC and create two threads.
+	AfxBeginThread(ThreadProc, this);
+	AfxBeginThread(ThreadProc, this);
+
+	// Wait to allow threads to complete work.
+	// (In a real MFC app, you might have a message loop or a proper shutdown process.)
+	Sleep(2000);
 
 	return TRUE;  // 포커스를 컨트롤에 설정하지 않으면 TRUE를 반환합니다.
 }
@@ -153,3 +162,31 @@ HCURSOR CMFCApplication1Dlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+
+void CMFCApplication1Dlg::OnClickedButton1()
+{
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+}
+
+// Thread function that increments shared data.
+UINT CMFCApplication1Dlg::ThreadProc(LPVOID pParam)
+{
+	CMFCApplication1Dlg* pDlg = (CMFCApplication1Dlg*)pParam;
+
+	for (int i = 0; i < 10; i++)
+	{
+		// Acquire the mutex lock before accessing shared data.
+		pDlg -> g_mutex.Lock();
+
+		// Critical section: safe access to shared resource.
+		pDlg -> g_sharedData++;
+		TRACE("Thread %d: Shared Data = %d\n", GetCurrentThreadId(), pDlg -> g_sharedData);
+
+		// Release the mutex lock.
+		pDlg -> g_mutex.Unlock();
+
+		// Sleep to simulate work.
+		Sleep(100);
+	}
+	return 0;
+}

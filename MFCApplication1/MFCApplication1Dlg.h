@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <afxmt.h>  // For CMutex
+#include <afxwin.h> // For AfxBeginThread
 
 // CMFCApplication1Dlg 대화 상자
 class CMFCApplication1Dlg : public CDialogEx
@@ -31,4 +33,12 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
+public:
+	afx_msg void OnClickedButton1();
+
+	// Global mutex and shared data variable.
+	CMutex g_mutex;
+	int g_sharedData = 0;
+
+	static UINT ThreadProc(LPVOID pParam);
 };
