@@ -36,9 +36,16 @@ protected:
 public:
 	afx_msg void OnClickedButton1();
 
+	CWinThread* m_pThread1;
+	CWinThread* m_pThread2;
+	bool m_bExitFlag;
+
 	// Global mutex and shared data variable.
 	CMutex g_mutex;
 	int g_sharedData = 0;
 
 	static UINT ThreadProc(LPVOID pParam);
+	static void Wait(ULONGLONG dwMillisecond);
+
+	void ExitThread();
 };

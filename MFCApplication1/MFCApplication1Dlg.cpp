@@ -52,6 +52,9 @@ END_MESSAGE_MAP()
 
 CMFCApplication1Dlg::CMFCApplication1Dlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_MFCAPPLICATION1_DIALOG, pParent)
+	, m_pThread1(nullptr)
+	, m_pThread2(nullptr)
+	, m_bExitFlag(false)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -102,13 +105,14 @@ BOOL CMFCApplication1Dlg::OnInitDialog()
 
 	// TODO: 여기에 추가 초기화 작업을 추가합니다.
 
-	// Initialize MFC and create two threads.
-	AfxBeginThread(ThreadProc, this);
-	AfxBeginThread(ThreadProc, this);
+	// Create threads with auto-deletion disabled so you can wait on them.
+	m_pThread1 = AfxBeginThread(ThreadProc, this);
+	if (m_pThread1)
+		m_pThread1->m_bAutoDelete = FALSE;
 
-	// Wait to allow threads to complete work.
-	// (In a real MFC app, you might have a message loop or a proper shutdown process.)
-	Sleep(2000);
+	m_pThread2 = AfxBeginThread(ThreadProc, this);
+	if (m_pThread2)
+		m_pThread2->m_bAutoDelete = FALSE;
 
 	return TRUE;  // 포커스를 컨트롤에 설정하지 않으면 TRUE를 반환합니다.
 }
@@ -165,28 +169,81 @@ HCURSOR CMFCApplication1Dlg::OnQueryDragIcon()
 
 void CMFCApplication1Dlg::OnClickedButton1()
 {
+	TRACE(_T("스레드를 종료합니다. \n"));
+
+	ExitThread();
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 }
 
+// 2025/03/03
+// 스레드를 나가기 전까지는 계속적으로 g_sharedData++ 를 해줍니다.
 // Thread function that increments shared data.
 UINT CMFCApplication1Dlg::ThreadProc(LPVOID pParam)
 {
 	CMFCApplication1Dlg* pDlg = (CMFCApplication1Dlg*)pParam;
 
-	for (int i = 0; i < 10; i++)
+	while (!pDlg->m_bExitFlag)
 	{
 		// Acquire the mutex lock before accessing shared data.
-		pDlg -> g_mutex.Lock();
+		pDlg->g_mutex.Lock();
 
 		// Critical section: safe access to shared resource.
-		pDlg -> g_sharedData++;
-		TRACE("Thread %d: Shared Data = %d\n", GetCurrentThreadId(), pDlg -> g_sharedData);
+		pDlg->g_sharedData++;
+		TRACE("Thread %d: Shared Data = %d\n", GetCurrentThreadId(), pDlg->g_sharedData);
 
 		// Release the mutex lock.
-		pDlg -> g_mutex.Unlock();
+		pDlg->g_mutex.Unlock();
 
 		// Sleep to simulate work.
-		Sleep(100);
+		Wait(100);
 	}
+
 	return 0;
+}
+
+// 2025/03/03
+// Sleep은 모든 메시지를 멈추게 하기 때문에, 해당 코드를 사용합니다.
+void CMFCApplication1Dlg::Wait(ULONGLONG dwMillisecond)
+{
+	MSG message;
+	ULONGLONG ullStart = GetTickCount64();
+
+	while (GetTickCount64() - ullStart < dwMillisecond)
+	{
+		while (PeekMessage(&message, NULL, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&message);
+			DispatchMessage(&message);
+		}
+	}
+}
+
+// 2025/03/03
+// 스레드를 다 종료합니다.
+void CMFCApplication1Dlg::ExitThread()
+{
+	if (m_pThread1 != nullptr && m_pThread2 != nullptr)
+	{
+		m_bExitFlag = true;
+
+		DWORD dwResultForThread1 = ::WaitForSingleObject(m_pThread1->m_hThread, INFINITE);
+
+		if (dwResultForThread1 == WAIT_FAILED)
+			TRACE(_T("Thread1 Exit Failed \n"));
+		else if (dwResultForThread1 == WAIT_OBJECT_0)
+			TRACE(_T("Thread1 Exit \n"));
+
+		DWORD dwResultForThread2 = ::WaitForSingleObject(m_pThread2->m_hThread, INFINITE);
+
+		if (dwResultForThread2 == WAIT_FAILED)
+			TRACE(_T("Thread2 Exit Failed \n"));
+		else if (dwResultForThread2 == WAIT_OBJECT_0)
+			TRACE(_T("Thread2 Exit \n"));
+	
+		// Clean up thread objects manually.
+		delete m_pThread1;
+		delete m_pThread2;
+		m_pThread1 = nullptr;
+		m_pThread2 = nullptr;
+	}
 }
